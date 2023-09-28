@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from "styled-components";
-import TikiTakiToki from "./TikiTakiToki";
+import {TikiTakiToki} from "./TikiTakiToki";
 import "papercss/dist/paper.min.css";
 
 export default function App() {
