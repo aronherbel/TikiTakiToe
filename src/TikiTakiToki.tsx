@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { DIMENSIONS, PLAYER_X, PLAYER_O, SQUARE_DIMS, GAME_STATES, DRAW } from "./constants";
 import { getRandomInt, switchPlayer } from "./utils";
 import Board from "./board";
+import { minimax } from "./minimax";
 
 const board = new Board();
 
@@ -36,13 +37,16 @@ export const TikiTakiToki = () => {
   );
 
     const aiMove = useCallback(() => {
-      let index = getRandomInt(0, 8);
-      while (grid[index]) {
-          index = getRandomInt(0, 8)
+      const board = new Board(grid.concat());
+      const index = board.isEmpty(grid)
+        ? getRandomInt(0, 8)
+        : minimax(board, players.ai!)[1];
+      
+      if (index !== null && !grid[index]) {
+        move(index, players.ai);
+        setNextMove(players.human);
       }
-      move(index, players.ai);
-      setNextMove(players.human);
-   }, [move, grid, players]);
+     }, [move, grid, players]);
 
 
     const [nextMove, setNextMove] = useState<null|number>(null);

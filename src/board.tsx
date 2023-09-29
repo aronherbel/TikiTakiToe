@@ -4,6 +4,14 @@ import { DIMENSIONS, DRAW } from "./constants";
 type Grid = Array<null | number>;
 
 export default class Board {
+    
+    makeMove = (square: number, player: number) => {
+       if(this.grid[square] === null){
+        this.grid[square] = player;
+       }
+    };
+
+
     grid: Grid;
     constructor(grid?: Grid) {
         this.grid = grid || new Array(DIMENSIONS ** 2).fill(null);
