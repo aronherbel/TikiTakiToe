@@ -4,24 +4,64 @@ import { DIMENSIONS, PLAYER_X, PLAYER_O, SQUARE_DIMS, GAME_STATES, DRAW } from "
 import { getRandomInt, switchPlayer } from "./utils";
 import Board from "./board";
 import { minimax } from "./minimax";
+import { GAME_MODES } from "./constants";
+import { ResultModal } from "./resultModal";
+import { border } from "./styles";
 
 const board = new Board();
+const arr = new Array(DIMENSIONS ** 2).fill(null);
 
+interface Props {
+  squares?: Array<number | null>;
+}
 
-const emptyGrid = new Array(DIMENSIONS ** 2).fill(null);
+export const TikiTakiToki = ({squares = arr }: Props) => {
 
-export const TikiTakiToki = () => {
-
-    const [grid, setGrid] = useState(emptyGrid);
+    const [grid, setGrid] = useState(arr);
    
     const [winner, setWinner] = useState<null | string>(null);
+
+    const [nextMove, setNextMove] = useState<null|number>(null);
 
     const [players, setPlayers] = useState<Record<string, number | null>>({
         human: null,
         ai: null,
     });
+
+    const [modalOpen, setModalOpen] = useState(false);
+
+    const [mode, setMode] = useState(GAME_MODES.medium)
     
     const [gameState, setGameState] = useState(GAME_STATES.notStarted);
+
+
+    useEffect(() => {
+      const boardWinner = board.getWinner(grid);
+  
+      const declareWinner = (winner: number) => {
+        let winnerStr = "";
+        switch (winner) {
+          case PLAYER_X:
+            winnerStr = "Player X wins!";
+            break;
+          case PLAYER_O:
+            winnerStr = "Player O wins!"
+            break;
+          case DRAW:
+          default:
+            winnerStr = "It's a draw"
+          }
+          setGameState(GAME_STATES.over);
+          setWinner(winnerStr);
+  
+          setTimeout(() => setModalOpen(true), 300);
+      };
+
+      if (boardWinner !== null && gameState !== GAME_STATES.over){
+        declareWinner(boardWinner);
+      }
+    }, [gameState, grid, nextMove]);
+   
 
     const move = useCallback(
       (index: number, player: number | null) => {
@@ -38,21 +78,63 @@ export const TikiTakiToki = () => {
 
     const aiMove = useCallback(() => {
       const board = new Board(grid.concat());
-      const index = board.isEmpty(grid)
-        ? getRandomInt(0, 8)
-        : minimax(board, players.ai!)[1];
-      
-      if (index !== null && !grid[index]) {
-        move(index, players.ai);
-        setNextMove(players.human);
+      const emptyIndices = board.getEmptySquare(grid);
+
+      let index: any;
+
+      switch (mode){
+        //EasyMode
+        case GAME_MODES.easy:
+          do{
+            index = getRandomInt(0, 8)
+          } while (!emptyIndices.includes(index));
+          break;
+        //Medium Mode
+        case GAME_MODES.medium:
+          const smartMove = !board.isEmpty(grid) && Math.random() < 0.5;
+          if(smartMove){
+            index = minimax(board, players.ai!)[1];
+          } else{
+            do{
+              index = getRandomInt(0, 8)
+            } while (!emptyIndices.includes(index));
+          }
+          break;
+         //Difficult Mode
+        case GAME_MODES.difficult:
+          default:
+             index = board.isEmpty(grid)
+            ? getRandomInt(0, 8)
+            : minimax(board, players.ai!)[1];
       }
-     }, [move, grid, players]);
+
+      if (index !== null && !grid[index]) {
+        if(players.ai !== null) {
+         move(index, players.ai);
+        }
+        setNextMove(players.human);
+       }
+      }, [move, grid, players, mode]);
 
 
-    const [nextMove, setNextMove] = useState<null|number>(null);
+      useEffect(() => {
+        let timeout: NodeJS.Timeout;
+        if (
+          nextMove !== null &&
+          nextMove === players.ai &&
+          gameState !== GAME_STATES.over
+        ) {
+          // Delay AI moves to make them more natural
+          timeout = setTimeout(() => {
+            aiMove();
+          }, 500);
+        }
+        return () => timeout && clearTimeout(timeout);
+      }, [nextMove, aiMove, players.ai, gameState]);
+    
+    
 
-
-    const humanMove = (index: number) =>{
+      const humanMove = (index: number) =>{
         if(!grid[index] && nextMove === players.human){
             move(index, players.human);
             setNextMove(players.ai);
@@ -60,96 +142,92 @@ export const TikiTakiToki = () => {
     };
 
 
-   useEffect(() => {
-    const boardWinner = board.getWinner(grid);
-    const declareWinner = (winner: number) => {
-      let winnerStr = "";
-      switch (winner) {
-        case PLAYER_X:
-          winnerStr = "Player X wins!";
-          break;
-        case PLAYER_O:
-          winnerStr = "Player O wins!"
-          break;
-        case DRAW:
-        default:
-          winnerStr = "It's a draw"
-        }
-        setGameState(GAME_STATES.over);
-        setWinner(winnerStr);
-    };
-
-    if (boardWinner !== null && gameState !== GAME_STATES.over){
-      declareWinner(boardWinner);
-    }
-
-    let timeout: NodeJS.Timeout;
-    if(
-      nextMove !== null &&
-      nextMove === players.ai && 
-      gameState !== GAME_STATES.over
-    ){
-      timeout = setTimeout(() => {
-        aiMove();
-      }, 500);
-    }
-    return () => timeout && clearTimeout(timeout);
-    
-   }, [gameState, grid, nextMove]);
-
-    
     const choosePlayer = (option: number) => {
         setPlayers({human: option, ai: switchPlayer(option) });
         setGameState(GAME_STATES.inProgess);
 
         setNextMove(PLAYER_X);
-    }
-
-    const startNewGame = () => {
-      setGameState(GAME_STATES.notStarted);
-      setGrid(emptyGrid);
     };
 
 
-    switch (gameState){
-      case GAME_STATES.notStarted:
-        default:
-          return (
-            <div>
-              <Inner>
-                <p>Choose your player</p>
-                <ButtonRow>
-                  <button onClick={() => choosePlayer(PLAYER_X)}>X</button>
-                  <p>or</p>
-                  <button onClick={() => choosePlayer(PLAYER_O)}>O</button>
-                </ButtonRow>
-              </Inner>
-            </div>
-          );
-          case GAME_STATES.inProgess:
-            return (
-              <Container dims={DIMENSIONS}>
-                {grid.map((value, index) => {
-                  const isActive = value !== null;
-           
-                  return (
-                    <Square key={index} onClick={() => humanMove(index)}>
-                      {isActive && <Marker>{value === PLAYER_X ? "X" : "O"}</Marker>}
-                    </Square>
-                  );
-                })}
-              </Container>
-            );
-          case GAME_STATES.over:
-            return (
-              <div>
-                <h1>{winner}</h1>
-                <button onClick={startNewGame}>Start over</button>
-              </div>
-            );  
 
-    }
-}
+
+    const startNewGame = () => {
+      setGameState(GAME_STATES.notStarted);
+      setGrid(arr);
+      setModalOpen(false);
+    };
+
+   
+
+
+    const changeMode = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setMode(e.target.value);
+    };
+
+
+  
+
+
+
+   return gameState === GAME_STATES.notStarted ? (
+      <div>
+        <Inner>
+        <p>Select difficulty</p>
+          <select onChange={changeMode} value={mode}>
+            {Object.keys(GAME_MODES).map(key => {
+              const gameMode = GAME_MODES[key];
+              return(
+                <option key={gameMode} value={gameMode}>
+                  {key}
+                </option>
+              );
+            })}
+          </select>
+        </Inner>
+        <Inner>
+          <p>Choose your player</p>
+          <ButtonRow>
+            <button onClick={() => choosePlayer(PLAYER_X)}>X</button>
+            <p>or</p>
+            <button onClick={() => choosePlayer(PLAYER_O)}>O</button>
+          </ButtonRow>
+        </Inner>
+      </div>
+   ) : (
+    <Container dims={DIMENSIONS}>
+    {grid.map((value, index) => {
+      const isActive = value !== null;
+
+      return (
+        <Square data-testid={`square_${index}`} key={index} onClick={() => humanMove(index)}>
+          {isActive && <Marker>{value === PLAYER_X ? "X" : "O"}</Marker>}
+        </Square>
+      );
+    })}
+    <Strikethrough
+      styles={
+        gameState ===GAME_STATES.over ? board.getStrikethroughStyles() : ""
+      }
+      />
+      <ResultModal 
+      isOpen={modalOpen}
+      winner={winner}
+      close={() => setModalOpen(false)}
+      startNewGame={startNewGame}
+      />
+    </Container>
+   );
+
+} 
+
+const Strikethrough = styled.div<{ styles: string | null }>`
+  position: absolute;
+  ${({ styles }) => styles}
+  background-color: indianred;
+  height: 5px;
+  width: ${({ styles }) => !styles && "0px"};
+`;    
 
 const ButtonRow = styled.div`
   display: flex;
@@ -179,7 +257,7 @@ const Square = styled.div`
     align-items: center;
     width: ${SQUARE_DIMS}px;
     height: ${SQUARE_DIMS}px;
-    border: 1px solid black;
+    ${border}
 
     &:hover {
     cursor: pointer;
